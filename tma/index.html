@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>TON FlashBet</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0b0e;
+      --surface:  #111318;
+      --border:   #1e2028;
+      --text:     #e8eaf0;
+      --muted:    #6b7280;
+      --accent:   #6366f1;
+      --accent2:  #8b5cf6;
+      --green:    #22c55e;
+      --red:      #ef4444;
+      --yellow:   #f59e0b;
+      --radius:   8px;
+      --radius-lg: 12px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      font-size: 14px;
+    }
+
+    /* ── Layout ── */
+    #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 100;
+    }
+
+    .logo {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+    .logo span { color: var(--accent); }
+
+    .header-right { display: flex; align-items: center; gap: 12px; }
+
+    .balance-chip {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+    }
+    .balance-chip b { color: var(--text); }
+
+    /* ── Tab Bar ── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      padding: 0 16px;
+    }
+
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 11px 0;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      position: relative;
+      transition: color .15s;
+      border: none;
+      background: none;
+    }
+    .tab.active { color: var(--text); }
+    .tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 25%;
+      right: 25%;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px 2px 0 0;
+    }
+
+    /* ── Main ── */
+    .main { flex: 1; padding: 16px; overflow-y: auto; }
+
+    /* ── Filter row ── */
+    .filter-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 14px;
+      scrollbar-width: none;
+    }
+    .filter-row::-webkit-scrollbar { display: none; }
+
+    .filter-chip {
+      flex-shrink: 0;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .filter-chip.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ── Bet Card ── */
+    .bet-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .bet-card:hover { border-color: #2e3040; }
+
+    .bet-card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .cat-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+    .cat-dot.crypto { background: var(--accent); }
+    .cat-dot.weather { background: var(--green); }
+    .cat-dot.sport   { background: var(--yellow); }
+    .cat-dot.custom  { background: var(--muted); }
+
+    .bet-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.4;
+      flex: 1;
+    }
+
+    .status-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      flex-shrink: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .status-active   { background: rgba(34,197,94,.12); color: var(--green); }
+    .status-pending  { background: rgba(245,158,11,.12); color: var(--yellow); }
+    .status-voting   { background: rgba(99,102,241,.12); color: var(--accent); }
+    .status-resolved { background: rgba(107,114,128,.12); color: var(--muted); }
+
+    /* ── Probability bar ── */
+    .prob-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .prob-option { flex: 1; }
+    .prob-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-bottom: 4px;
+      color: var(--muted);
+    }
+    .prob-label b { color: var(--text); font-weight: 600; }
+    .prob-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .prob-fill { height: 100%; border-radius: 2px; transition: width .3s; }
+    .prob-fill.yes { background: var(--green); }
+    .prob-fill.no  { background: var(--red); }
+    .prob-fill.other { background: var(--accent); }
+
+    .bet-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .bet-meta-item { display: flex; align-items: center; gap: 4px; }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 10px;
+    }
+
+    /* ── Bet Detail Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
+    }
+    .modal {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-radius: 16px 16px 0 0;
+      width: 100%;
+      max-height: 92vh;
+      overflow-y: auto;
+      padding: 16px;
+      animation: slideUp .2s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+    .modal-handle {
+      width: 36px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 16px;
+    }
+
+    /* ── Inputs ── */
+    .input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .input:focus { border-color: var(--accent); }
+    .input::placeholder { color: var(--muted); }
+    textarea.input { resize: vertical; min-height: 70px; }
+
+    select.input { cursor: pointer; }
+
+    .label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .form-group { margin-bottom: 14px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 11px 16px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      border: none;
+      cursor: pointer;
+      transition: opacity .15s;
+      width: 100%;
+    }
+    .btn:active { opacity: .8; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-danger  { background: var(--red); color: #fff; }
+    .btn-sm { padding: 7px 12px; font-size: 12px; width: auto; }
+
+    /* ── Option buttons ── */
+    .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .option-btn {
+      padding: 10px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      text-align: center;
+      transition: all .15s;
+    }
+    .option-btn:hover { border-color: var(--accent); }
+    .option-btn.selected-yes { background: rgba(34,197,94,.1); border-color: var(--green); color: var(--green); }
+    .option-btn.selected-no  { background: rgba(239,68,68,.1); border-color: var(--red); color: var(--red); }
+    .option-btn.selected     { background: rgba(99,102,241,.1); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Amount selector ── */
+    .amount-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .amount-chip {
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s;
+      background: transparent;
+      font-family: inherit;
+    }
+    .amount-chip.selected { border-color: var(--accent); color: var(--accent); background: rgba(99,102,241,.08); }
+
+    /* ── Stats row ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .stat-lbl {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    /* ── Profile ── */
+    .profile-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .avatar {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .profile-name { font-size: 16px; font-weight: 700; }
+    .profile-sub  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* ── Admin panel ── */
+    .admin-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--yellow);
+      background: rgba(245,158,11,.12);
+      padding: 3px 8px;
+      border-radius: 10px;
+    }
+
+    .admin-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .admin-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .admin-card-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+    .admin-actions { display: flex; gap: 8px; }
+
+    /* ── Divider ── */
+    .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+    /* ── Price ticker ── */
+    .ticker {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 14px;
+      scrollbar-width: none;
+    }
+    .ticker::-webkit-scrollbar { display: none; }
+    .ticker-item {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .ticker-name { font-size: 10px; color: var(--muted); text-transform: uppercase; }
+    .ticker-price { font-size: 13px; font-weight: 700; }
+    .ticker-change { font-size: 10px; }
+    .ticker-change.up { color: var(--green); }
+    .ticker-change.down { color: var(--red); }
+
+    /* ── Referral box ── */
+    .ref-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .ref-code {
+      font-family: monospace;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(99,102,241,.08);
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      text-align: center;
+      margin: 10px 0;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border: 1px dashed var(--accent);
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #fff;
+      color: #111;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 20px;
+      z-index: 999;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .2s;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 36px; margin-bottom: 10px; }
+    .empty-text { font-size: 13px; line-height: 1.6; }
+
+    /* ── Voting ── */
+    .vote-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .vote-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all .15s;
+      background: transparent;
+    }
+    .vote-btn:hover { opacity: .8; }
+    .vote-btn.green { border-color: var(--green); color: var(--green); }
+    .vote-btn.red   { border-color: var(--red); color: var(--red); }
+
+    /* ── Utility ── */
+    .hidden { display: none !important; }
+    .mt8  { margin-top: 8px; }
+    .mt12 { margin-top: 12px; }
+    .mt16 { margin-top: 16px; }
+    .flex { display: flex; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; }
+    .text-sm { font-size: 12px; color: var(--muted); }
+    .text-green { color: var(--green); }
+    .text-red   { color: var(--red); }
+    .text-accent { color: var(--accent); }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">Flash<span>Bet</span></div>
+    <div class="header-right">
+      <div class="balance-chip" onclick="copyWallet()">⭐ <b id="bal">0</b></div>
+      <div id="adminBadge" class="admin-badge hidden">👑 Admin</div>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="tabs">
+    <button class="tab active" onclick="switchTab('markets')" id="tab-markets">Markets</button>
+    <button class="tab" onclick="switchTab('create')"  id="tab-create">Create</button>
+    <button class="tab" onclick="switchTab('profile')" id="tab-profile">Profile</button>
+    <button class="tab hidden" onclick="switchTab('admin')" id="tab-admin">Admin 👑</button>
+  </nav>
+
+  <!-- Main content -->
+  <div class="main" id="main">
+    <!-- injected by JS -->
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay hidden" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';  // same origin
+let tg = window.Telegram?.WebApp;
+if (tg) { tg.expand(); tg.setHeaderColor('#0a0b0e'); }
+
+let state = {
+  user: null,
+  bets: [],
+  tab: 'markets',
+  filter: 'all',
+  prices: {},
+  selectedBet: null,
+  selectedOption: null,
+  selectedAmount: 10,
+};
+
+// ── Init ──────────────────────────────────────────────────────────────────
+
+async function init() {
+  await loadUser();
+  await loadBets();
+  loadPrices();
+  renderTab();
+  setInterval(loadPrices, 30000);
+}
+
+async function loadUser() {
+  try {
+    const initData = tg?.initData || '';
+    const ref = new URLSearchParams(window.location.search).get('ref') || null;
+    const res = await post('/api/user', { initData, ref });
+    state.user = res;
+    document.getElementById('bal').textContent = res.balance ?? 0;
+    if (res.is_admin) {
+      document.getElementById('adminBadge').classList.remove('hidden');
+      document.getElementById('tab-admin').classList.remove('hidden');
+    }
+  } catch(e) { console.error('user', e); }
+}
+
+async function loadBets() {
+  try {
+    const data = await get('/api/bets?status=all');
+    state.bets = data;
+  } catch(e) { console.error('bets', e); }
+}
+
+async function loadPrices() {
+  try {
+    const data = await get('/api/prices');
+    state.prices = data;
+    renderPriceTicker();
+  } catch(e) {}
+}
+
+// ── Routing ───────────────────────────────────────────────────────────────
+
+function switchTab(tab) {
+  state.tab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab)?.classList.add('active');
+  renderTab();
+}
+
+function renderTab() {
+  const main = document.getElementById('main');
+  switch(state.tab) {
+    case 'markets': main.innerHTML = renderMarkets(); attachMarketEvents(); break;
+    case 'create':  main.innerHTML = renderCreate(); break;
+    case 'profile': main.innerHTML = renderProfile(); break;
+    case 'admin':   main.innerHTML = renderAdmin(); attachAdminEvents(); break;
+  }
+}
+
+// ── Markets Tab ───────────────────────────────────────────────────────────
+
+function renderMarkets() {
+  const categories = ['all', 'crypto', 'weather', 'sport', 'custom'];
+  const labels = { all: 'Все', crypto: 'Крипто', weather: 'Погода', sport: 'Спорт', custom: 'Личные' };
+
+  const filtered = state.bets.filter(b =>
+    (state.filter === 'all' || b.category === state.filter) && b.status !== 'rejected'
+  );
+
+  return `
+    <div class="ticker" id="ticker">
+      <div class="ticker-item">
+        <div class="ticker-name">BTC</div>
+        <div class="ticker-price" id="btc-price">—</div>
+        <div class="ticker-change" id="btc-ch">·</div>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-name">ETH</div>
+        <div class="ticker-price" id="eth-price">—</div>
+        <div class="ticker-change" id="eth-ch">·</div>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-name">TON</div>
+        <div class="ticker-price" id="ton-price">—</div>
+        <div class="ticker-change" id="ton-ch">·</div>
+      </div>
+    </div>
+
+    <div class="filter-row">
+      ${categories.map(c => `
+        <button class="filter-chip ${state.filter === c ? 'active' : ''}"
+          onclick="setFilter('${c}')">${labels[c]}</button>
+      `).join('')}
+    </div>
+
+    <div class="section-label">${filtered.length} рынков</div>
+
+    ${filtered.length === 0 ? `
+      <div class="empty">
+        <div class="empty-icon">📭</div>
+        <div class="empty-text">Ставок пока нет.<br>Создай первую!</div>
+      </div>
+    ` : filtered.map(b => renderBetCard(b)).join('')}
+  `;
+}
+
+function renderBetCard(b) {
+  const probs = calcProbs(b);
+  const total = formatNum(b.total_pool);
+  const timeLeft = formatTimeLeft(b.end_time);
+
+  return `
+    <div class="bet-card" onclick="openBet('${b.id}')">
+      <div class="bet-card-top">
+        <div class="cat-dot ${b.category}"></div>
+        <div class="bet-title">${escHtml(b.title)}</div>
+        <div class="status-badge status-${b.status}">${statusLabel(b.status)}</div>
+      </div>
+
+      <div class="prob-row">
+        ${b.options.slice(0, 2).map((opt, i) => {
+          const p = probs[opt] ?? 50;
+          const cls = i === 0 ? 'yes' : 'no';
+          return `
+            <div class="prob-option">
+              <div class="prob-label"><span>${escHtml(opt)}</span><b>${p}%</b></div>
+              <div class="prob-bar"><div class="prob-fill ${cls}" style="width:${p}%"></div></div>
+            </div>`;
+        }).join('')}
+      </div>
+
+      <div class="bet-meta">
+        <div class="bet-meta-item">⭐ ${total}</div>
+        <div class="bet-meta-item">👥 ${countParticipants(b)}</div>
+        ${timeLeft ? `<div class="bet-meta-item">⏱ ${timeLeft}</div>` : ''}
+        <div class="bet-meta-item" style="margin-left:auto;color:#4b5563;font-size:10px">@${escHtml(b.creator || '?')}</div>
+      </div>
+    </div>
+  `;
+}
+
+function attachMarketEvents() {
+  renderPriceTicker();
+}
+
+function renderPriceTicker() {
+  const p = state.prices;
+  if (!p) return;
+  setPrice('btc', p.bitcoin);
+  setPrice('eth', p.ethereum);
+  setPrice('ton', p['the-open-network']);
+}
+
+function setPrice(id, val) {
+  const el = document.getElementById(id + '-price');
+  if (el && val) el.textContent = '$' + formatNum(val);
+}
+
+function setFilter(f) { state.filter = f; renderTab(); }
+
+// ── Bet Modal ─────────────────────────────────────────────────────────────
+
+function openBet(id) {
+  const b = state.bets.find(x => x.id === id);
+  if (!b) return;
+  state.selectedBet = b;
+  state.selectedOption = null;
+  state.selectedAmount = 10;
+
+  const probs = calcProbs(b);
+  const isActive = b.status === 'active';
+  const isVoting = b.status === 'voting';
+  const isResolved = b.status === 'resolved';
+
+  const modal = document.getElementById('modal');
+  modal.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="status-badge status-${b.status}" style="margin-bottom:10px">${statusLabel(b.status)}</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:6px;line-height:1.4">${escHtml(b.title)}</div>
+    ${b.description ? `<div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.5">${escHtml(b.description)}</div>` : ''}
+
+    <div class="prob-row" style="margin-bottom:14px">
+      ${b.options.map((opt, i) => {
+        const p = probs[opt] ?? 50;
+        const cls = i === 0 ? 'yes' : (i === 1 ? 'no' : 'other');
+        return `
+          <div class="prob-option">
+            <div class="prob-label"><span>${escHtml(opt)}</span><b>${p}%</b></div>
+            <div class="prob-bar"><div class="prob-fill ${cls}" style="width:${p}%"></div></div>
+          </div>`;
+      }).join('')}
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-val">⭐ ${formatNum(b.total_pool)}</div>
+        <div class="stat-lbl">Пул</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">${countParticipants(b)}</div>
+        <div class="stat-lbl">Игроков</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">${formatTimeLeft(b.end_time) || '—'}</div>
+        <div class="stat-lbl">Осталось</div>
+      </div>
+    </div>
+
+    ${isActive ? `
+      <div class="section-label">Выбери исход</div>
+      <div class="option-grid">
+        ${b.options.map((opt, i) => `
+          <button class="option-btn" id="opt-btn-${i}"
+            onclick="selectOption('${escHtml(opt)}', ${i})">${escHtml(opt)}</button>
+        `).join('')}
+      </div>
+
+      <div class="section-label">Сумма ставки (⭐)</div>
+      <div class="amount-row">
+        ${[5, 10, 25, 50, 100].map(a => `
+          <button class="amount-chip ${a === state.selectedAmount ? 'selected' : ''}"
+            onclick="selectAmount(${a})">${a}</button>
+        `).join('')}
+      </div>
+
+      <div style="margin-bottom:14px">
+        <input class="input" type="number" id="amtInput" value="${state.selectedAmount}" 
+          min="1" placeholder="Введи сумму" oninput="state.selectedAmount = parseInt(this.value)||1">
+      </div>
+
+      <button class="btn btn-primary" onclick="placeBet()">
+        ⭐ Поставить
+      </button>
+    ` : ''}
+
+    ${isVoting && state.user ? `
+      <div class="section-label mt12">Голосование (вес = ваш стейк + репутация)</div>
+      <div class="vote-row">
+        ${b.options.map((opt, i) => `
+          <button class="vote-btn ${i === 0 ? 'green' : 'red'}"
+            onclick="castVote('${b.id}', '${escHtml(opt)}')">${escHtml(opt)}</button>
+        `).join('')}
+      </div>
+      <div class="text-sm mt8">За правильный голос +10 репутации и бонус ⭐</div>
+    ` : ''}
+
+    ${isResolved ? `
+      <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);
+        border-radius:var(--radius);padding:12px;text-align:center;margin-top:8px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Победитель</div>
+        <div style="font-size:18px;font-weight:700;color:var(--green)">${escHtml(b.resolved_option)}</div>
+      </div>
+    ` : ''}
+  `;
+
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function selectOption(opt, idx) {
+  state.selectedOption = opt;
+  document.querySelectorAll('.option-btn').forEach((el, i) => {
+    el.className = 'option-btn' + (i === idx ? (idx === 0 ? ' selected-yes' : ' selected-no') : '');
+  });
+}
+
+function selectAmount(a) {
+  state.selectedAmount = a;
+  document.querySelectorAll('.amount-chip').forEach((el, i) => {
+    const vals = [5, 10, 25, 50, 100];
+    el.className = 'amount-chip' + (vals[i] === a ? ' selected' : '');
+  });
+  const inp = document.getElementById('amtInput');
+  if (inp) inp.value = a;
+}
+
+async function placeBet() {
+  if (!state.selectedOption) { showToast('Выбери исход'); return; }
+  const amount = parseInt(document.getElementById('amtInput')?.value || state.selectedAmount);
+  if (amount < 1) { showToast('Укажи сумму'); return; }
+
+  try {
+    const res = await post(`/api/bets/${state.selectedBet.id}/join`, {
+      initData: tg?.initData || '',
+      option: state.selectedOption,
+      amount
+    });
+    if (res.error) { showToast(res.error); return; }
+    showToast('✅ Ставка принята!');
+    state.user.balance = res.new_balance;
+    document.getElementById('bal').textContent = res.new_balance;
+    const idx = state.bets.findIndex(x => x.id === state.selectedBet.id);
+    if (idx >= 0) state.bets[idx] = res.bet;
+    closeModal();
+    await loadBets();
+    renderTab();
+  } catch(e) { showToast('Ошибка'); }
+}
+
+async function castVote(betId, option) {
+  try {
+    const res = await post(`/api/bets/${betId}/vote`, {
+      initData: tg?.initData || '',
+      option
+    });
+    if (res.error) { showToast(res.error); return; }
+    showToast('🗳️ Голос принят!');
+    closeModal();
+    await loadBets();
+    renderTab();
+  } catch(e) { showToast('Ошибка'); }
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modalOverlay')) return;
+  document.getElementById('modalOverlay').classList.add('hidden');
+}
+
+// ── Create Tab ────────────────────────────────────────────────────────────
+
+function renderCreate() {
+  return `
+    <div class="section-label">Новая ставка</div>
+    <div class="form-group">
+      <label class="label">Вопрос *</label>
+      <input class="input" id="c-title" placeholder="BTC выше $100k до конца месяца?">
+    </div>
+    <div class="form-group">
+      <label class="label">Описание</label>
+      <textarea class="input" id="c-desc" placeholder="Доп. условия и контекст..."></textarea>
+    </div>
+    <div class="form-group">
+      <label class="label">Категория</label>
+      <select class="input" id="c-cat">
+        <option value="custom">💬 Личное / Любое</option>
+        <option value="crypto">₿ Крипто</option>
+        <option value="weather">🌦 Погода</option>
+        <option value="sport">⚽ Спорт</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="label">Варианты ответов</label>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <input class="input" id="opt-0" placeholder="Да" style="flex:1">
+        <input class="input" id="opt-1" placeholder="Нет" style="flex:1">
+      </div>
+      <div style="display:flex;gap:8px">
+        <input class="input" id="opt-2" placeholder="Вариант 3 (необяз.)" style="flex:1">
+        <input class="input" id="opt-3" placeholder="Вариант 4 (необяз.)" style="flex:1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="label">Тип оракула</label>
+      <select class="input" id="c-oracle" onchange="toggleOracleFields()">
+        <option value="vote">🗳️ Голосование участников</option>
+        <option value="price">📈 Цена крипто (авто)</option>
+      </select>
+    </div>
+    <div id="oracle-price-fields" class="hidden">
+      <div class="form-group">
+        <label class="label">Монета</label>
+        <select class="input" id="c-coin">
+          <option value="bitcoin">Bitcoin (BTC)</option>
+          <option value="ethereum">Ethereum (ETH)</option>
+          <option value="the-open-network">TON</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="label">Целевая цена (USD)</label>
+        <input class="input" id="c-target" type="number" placeholder="100000">
+      </div>
+      <div class="form-group">
+        <label class="label">Направление</label>
+        <select class="input" id="c-dir">
+          <option value="above">Выше или равно</option>
+          <option value="below">Ниже или равно</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="label">Дата закрытия</label>
+      <input class="input" id="c-end" type="datetime-local">
+    </div>
+
+    <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);
+      border-radius:var(--radius);padding:10px 12px;margin-bottom:16px;font-size:12px;color:var(--muted)">
+      ⚠️ Ставка будет отправлена на проверку администратору перед публикацией.
+    </div>
+
+    <button class="btn btn-primary" onclick="submitBet()">📤 Создать ставку</button>
+  `;
+}
+
+function toggleOracleFields() {
+  const val = document.getElementById('c-oracle')?.value;
+  document.getElementById('oracle-price-fields')?.classList.toggle('hidden', val !== 'price');
+}
+
+async function submitBet() {
+  const title = document.getElementById('c-title')?.value.trim();
+  if (!title) { showToast('Введи вопрос'); return; }
+
+  const opts = ['opt-0', 'opt-1', 'opt-2', 'opt-3']
+    .map(id => document.getElementById(id)?.value.trim())
+    .filter(Boolean);
+
+  if (opts.length < 2) { showToast('Нужно минимум 2 варианта'); return; }
+
+  const oracleType = document.getElementById('c-oracle')?.value || 'vote';
+  let oracleParams = {};
+  if (oracleType === 'price') {
+    oracleParams = {
+      coin_id: document.getElementById('c-coin')?.value,
+      target_price: parseFloat(document.getElementById('c-target')?.value || 0),
+      direction: document.getElementById('c-dir')?.value
+    };
+  }
+
+  const body = {
+    initData: tg?.initData || '',
+    title,
+    description: document.getElementById('c-desc')?.value.trim(),
+    category: document.getElementById('c-cat')?.value,
+    options: opts,
+    end_time: document.getElementById('c-end')?.value,
+    oracle_type: oracleType,
+    oracle_params: oracleParams
+  };
+
+  try {
+    const res = await post('/api/bets', body);
+    if (res.error) { showToast(res.error); return; }
+    showToast('✅ Отправлено на проверку!');
+    await loadBets();
+    switchTab('markets');
+  } catch(e) { showToast('Ошибка'); }
+}
+
+// ── Profile Tab ───────────────────────────────────────────────────────────
+
+function renderProfile() {
+  const u = state.user || {};
+  const initial = (u.username || 'U')[0].toUpperCase();
+  const refLink = `https://t.me/your_bot?start=ref_${u.id}`;
+
+  const myBets = state.bets.filter(b => u.bets_joined?.includes(b.id));
+  const myCreated = state.bets.filter(b => b.creator_id === u.id);
+
+  return `
+    <div class="profile-header">
+      <div class="avatar">${initial}</div>
+      <div>
+        <div class="profile-name">@${escHtml(u.username || 'User')}</div>
+        <div class="profile-sub">Репутация: ${u.reputation ?? 100} ⭐</div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-val">⭐ ${formatNum(u.balance ?? 0)}</div>
+        <div class="stat-lbl">Баланс</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">${myBets.length}</div>
+        <div class="stat-lbl">Ставок</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">${u.win_rate ?? 0}%</div>
+        <div class="stat-lbl">Win Rate</div>
+      </div>
+    </div>
+
+    <div class="ref-box">
+      <div class="section-label">Реферальная программа</div>
+      <div class="text-sm">Приглашай друзей — получай бонусы за их активность</div>
+      <div class="ref-code" onclick="copyRef('${refLink}')">🔗 ref_${u.id}</div>
+      <div class="flex-between">
+        <div class="text-sm">Рефералов: <b style="color:var(--text)">${(u.referrals || []).length}</b></div>
+        <button class="btn btn-secondary btn-sm" onclick="copyRef('${refLink}')">Копировать</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-label">Мои ставки (${myBets.length})</div>
+    ${myBets.length === 0 ? `<div class="text-sm">Ещё не участвовал ни в одной ставке.</div>` : ''}
+    ${myBets.slice(0, 5).map(b => `
+      <div class="bet-card" onclick="openBet('${b.id}')">
+        <div class="flex-between">
+          <div style="font-size:13px;font-weight:600;flex:1;padding-right:10px">${escHtml(b.title)}</div>
+          <div class="status-badge status-${b.status}">${statusLabel(b.status)}</div>
+        </div>
+        <div class="text-sm mt8">Пул: ⭐ ${formatNum(b.total_pool)}</div>
+      </div>
+    `).join('')}
+
+    <div class="section-label mt16">Созданные ставки (${myCreated.length})</div>
+    ${myCreated.length === 0 ? `<div class="text-sm">Ещё не создавал ставок.</div>` : ''}
+    ${myCreated.slice(0, 5).map(b => `
+      <div class="bet-card" onclick="openBet('${b.id}')">
+        <div class="flex-between">
+          <div style="font-size:13px;font-weight:600;flex:1;padding-right:10px">${escHtml(b.title)}</div>
+          <div class="status-badge status-${b.status}">${statusLabel(b.status)}</div>
+        </div>
+        <div class="text-sm mt8">Пул: ⭐ ${formatNum(b.total_pool)}</div>
+      </div>
+    `).join('')}
+
+    <div class="divider"></div>
+
+    <div class="admin-card">
+      <div class="section-label">Казна проекта</div>
+      <div class="text-sm">Адрес: <span style="font-family:monospace;font-size:11px;word-break:break-all">${escHtml('UQCfdyrb0Fj8lA32OfizTwGY829tTzihsEYl1FrpBzeVKdi0')}</span></div>
+      <div class="flex-between mt8">
+        <div class="text-sm">Сбор (5% fee)</div>
+        <button class="btn btn-secondary btn-sm" onclick="loadTreasury()">Посмотреть</button>
+      </div>
+      <div id="treasury-info" class="text-sm mt8 hidden"></div>
+    </div>
+  `;
+}
+
+async function loadTreasury() {
+  const res = await get('/api/treasury');
+  const el = document.getElementById('treasury-info');
+  if (el) {
+    el.innerHTML = `Баланс: ⭐ ${formatNum(res.balance)} · Оборот: ⭐ ${formatNum(res.total_volume)}`;
+    el.classList.remove('hidden');
+  }
+}
+
+function copyRef(link) {
+  navigator.clipboard?.writeText(link).then(() => showToast('Ссылка скопирована!'));
+}
+
+function copyWallet() {
+  const w = 'UQCfdyrb0Fj8lA32OfizTwGY829tTzihsEYl1FrpBzeVKdi0';
+  navigator.clipboard?.writeText(w).then(() => showToast('Адрес скопирован!'));
+}
+
+// ── Admin Tab ─────────────────────────────────────────────────────────────
+
+function renderAdmin() {
+  if (!state.user?.is_admin) return '<div class="empty"><div class="empty-icon">🔒</div><div>Нет доступа</div></div>';
+
+  const pending = state.bets.filter(b => b.status === 'pending');
+  const active  = state.bets.filter(b => b.status === 'active');
+  const voting  = state.bets.filter(b => b.status === 'voting');
+
+  return `
+    <div class="flex-between" style="margin-bottom:16px">
+      <div class="section-label">Панель администратора</div>
+      <div class="admin-badge">👑 Admin</div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-val text-yellow">${pending.length}</div>
+        <div class="stat-lbl">На проверке</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val text-green">${active.length}</div>
+        <div class="stat-lbl">Активных</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val text-accent">${voting.length}</div>
+        <div class="stat-lbl">Голосуют</div>
+      </div>
+    </div>
+
+    <div class="section-label">Ожидают проверки (${pending.length})</div>
+    ${pending.length === 0 ? '<div class="text-sm" style="margin-bottom:16px">Нет ожидающих ставок</div>' : ''}
+    ${pending.map(b => `
+      <div class="admin-card">
+        <div class="admin-card-title">${escHtml(b.title)}</div>
+        <div class="admin-card-desc">
+          ${b.description ? escHtml(b.description) + '<br>' : ''}
+          <b>Категория:</b> ${b.category} · <b>Оракул:</b> ${b.oracle_type} · <b>Автор:</b> @${escHtml(b.creator)}
+        </div>
+        <div class="admin-actions">
+          <button class="btn btn-success btn-sm" onclick="adminApprove('${b.id}')">✅ Одобрить</button>
+          <button class="btn btn-danger btn-sm" onclick="adminReject('${b.id}')">❌ Отклонить</button>
+        </div>
+      </div>
+    `).join('')}
+
+    <div class="section-label">Активные ставки</div>
+    ${active.map(b => `
+      <div class="admin-card">
+        <div class="admin-card-title">${escHtml(b.title)}</div>
+        <div class="admin-card-desc">Пул: ⭐ ${formatNum(b.total_pool)} · Игроков: ${countParticipants(b)}</div>
+        <div class="section-label" style="margin-bottom:8px">Завершить голосованием:</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${b.options.map(opt => `
+            <button class="btn btn-secondary btn-sm" onclick="adminResolve('${b.id}', '${escHtml(opt)}')">${escHtml(opt)}</button>
+          `).join('')}
+          <button class="btn btn-secondary btn-sm" onclick="adminStartVoting('${b.id}')">🗳️ Запустить голосование</button>
+          ${b.oracle_type === 'price' ? `<button class="btn btn-secondary btn-sm" onclick="adminOracleCheck('${b.id}')">🔮 Оракул</button>` : ''}
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function attachAdminEvents() {}
+
+async function adminApprove(betId) {
+  const res = await post(`/api/admin/bets/${betId}/approve`, { initData: tg?.initData || '' });
+  if (res.error) { showToast(res.error); return; }
+  showToast('✅ Ставка одобрена');
+  await loadBets(); renderTab();
+}
+
+async function adminReject(betId) {
+  const res = await post(`/api/admin/bets/${betId}/reject`, { initData: tg?.initData || '' });
+  if (res.error) { showToast(res.error); return; }
+  showToast('❌ Ставка отклонена');
+  await loadBets(); renderTab();
+}
+
+async function adminResolve(betId, option) {
+  const res = await post(`/api/admin/bets/${betId}/resolve`, { initData: tg?.initData || '', option });
+  if (res.error) { showToast(res.error); return; }
+  showToast(`🏆 Победитель: ${option}`);
+  await loadBets(); renderTab();
+}
+
+async function adminStartVoting(betId) {
+  // Move bet to voting phase
+  try {
+    const b = state.bets.find(x => x.id === betId);
+    if (b) b.status = 'voting';
+    showToast('🗳️ Голосование запущено');
+    renderTab();
+  } catch(e) { showToast('Ошибка'); }
+}
+
+async function adminOracleCheck(betId) {
+  try {
+    const res = await post(`/api/oracle/check/${betId}`, { initData: tg?.initData || '' });
+    showToast(`🔮 ${res.winner || 'Проверено'}`);
+    await loadBets(); renderTab();
+  } catch(e) { showToast('Ошибка оракула'); }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+function calcProbs(b) {
+  const total = b.total_pool || 1;
+  const probs = {};
+  for (const opt of b.options) {
+    const stake = b.stakes[opt] || 0;
+    probs[opt] = Math.round((stake / total) * 100);
+  }
+  // normalize
+  const sum = Object.values(probs).reduce((a, x) => a + x, 0);
+  if (sum === 0) {
+    const each = Math.round(100 / b.options.length);
+    b.options.forEach(opt => probs[opt] = each);
+  }
+  return probs;
+}
+
+function countParticipants(b) {
+  return Object.values(b.participants || {}).reduce((sum, arr) => sum + arr.length, 0);
+}
+
+function formatNum(n) {
+  if (!n && n !== 0) return '—';
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(1) + 'k';
+  return String(Math.round(n));
+}
+
+function formatTimeLeft(ts) {
+  if (!ts) return null;
+  const diff = new Date(ts) - Date.now();
+  if (diff < 0) return 'Завершено';
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor((diff % 86400000) / 3600000);
+  if (d > 0) return `${d}д ${h}ч`;
+  const m = Math.floor((diff % 3600000) / 60000);
+  if (h > 0) return `${h}ч ${m}м`;
+  return `${m}м`;
+}
+
+function statusLabel(s) {
+  return { pending: 'На проверке', active: 'Активна', voting: 'Голосование', resolved: 'Завершена', rejected: 'Отклонена' }[s] || s;
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function get(url) {
+  const r = await fetch(API + url);
+  return r.json();
+}
+
+async function post(url, body) {
+  const r = await fetch(API + url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
